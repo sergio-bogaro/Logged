@@ -1,0 +1,6 @@
+# Variáveis locais (contêm chaves reais) — não versionar.
+.env
+.env.local
+
+# Arquivos soltos da raiz
+/a.md

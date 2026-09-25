@@ -1,0 +1,36 @@
+name: logged
+
+services:
+  api:
+    build: ./LoggedApi
+    container_name: logged-api
+    # Segredos do IGDB ficam no .env do próprio backend. Opcional: se não existir,
+    # o app sobe normalmente (a busca de jogos fica indisponível).
+    env_file:
+      - path: ./LoggedApi/.env
+        required: false
+    environment:
+      DATABASE_URL: sqlite:////data/logged.db
+      UPLOAD_DIR: /data/uploads
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:8000"]'
+    volumes:
+      - logged_data:/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./LoggedApp
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+        VITE_TMDB_API_KEY: ${VITE_TMDB_API_KEY:-}
+    container_name: logged-web
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+volumes:
+  logged_data:

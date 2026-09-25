@@ -1,0 +1,6 @@
+[submodule "LoggedApi"]
+	path = LoggedApi
+	url = https://github.com/sergio-bogaro/LoggedApi.git
+[submodule "LoggedApp"]
+	path = LoggedApp
+	url = https://github.com/sergio-bogaro/LoggedApp.git
