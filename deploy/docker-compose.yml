@@ -1,0 +1,59 @@
+# Compose para rodar o Logged em qualquer dashboard/gerenciador de home server.
+#
+# Usa as imagens públicas do GHCR — NÃO constrói nada, apenas baixa e sobe.
+# Funciona em: Docker Compose (SSH), Portainer, Dockge, Komodo, CasaOS (app
+# customizado), etc. O bloco `x-casaos` no fim é ignorado pelos demais.
+#
+#   docker compose -f deploy/docker-compose.yml up -d
+#
+# Variáveis (opcionais) — defina num .env ao lado deste arquivo:
+#   LOGGED_TAG       tag da imagem (padrão: latest; ex.: 1.0.0)
+#   LOGGED_WEB_PORT  porta no host (padrão: 5173)
+#   IGDB_CLIENT_ID / IGDB_CLIENT_SECRET  credenciais para a busca de jogos
+
+services:
+  api:
+    image: ghcr.io/sergio-bogaro/logged-api:${LOGGED_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:////data/logged.db
+      UPLOAD_DIR: /data/uploads
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
+    volumes:
+      - logged_data:/data
+      # Para os dados ficarem visíveis no host (backup simples), troque a linha
+      # acima por um bind mount, por exemplo:
+      #   - /caminho/no/host/logged:/data
+
+  web:
+    image: ghcr.io/sergio-bogaro/logged-web:${LOGGED_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${LOGGED_WEB_PORT:-5173}:80"
+
+volumes:
+  logged_data:
+
+# Metadados opcionais do CasaOS. Ignorados por Docker Compose, Portainer, Dockge, etc.
+x-casaos:
+  architectures:
+    - amd64
+  main: web
+  author: sergio-bogaro
+  developer: sergio-bogaro
+  icon: https://raw.githubusercontent.com/sergio-bogaro/LoggedApp/master/public/favicon.svg
+  title:
+    en_us: Logged
+  tagline:
+    en_us: Track everything you consume
+  description:
+    en_us: >-
+      Self-hosted tracker for the movies, series, anime, manga, games and books
+      you consume.
+  category: Media
+  port_map: "5173"
+  scheme: http
+  index: /

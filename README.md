@@ -1,10 +1,13 @@
 # Logged — deploy
 
 Repositório de orquestração que sobe o backend ([LoggedApi](https://github.com/sergio-bogaro/LoggedApi))
-e o frontend ([LoggedApp](https://github.com/sergio-bogaro/LoggedApp)) juntos via Docker Compose.
+e o frontend ([LoggedApp](https://github.com/sergio-bogaro/LoggedApp)) juntos.
 
-Os dois projetos entram como **git submodules**; este repo guarda apenas o `docker-compose.yml`,
-o compose do CasaOS, o `Dockerfile` de cada app (dentro dos submodules) e a configuração do Nginx.
+Os dois projetos entram como **git submodules**; este repo guarda o(s) `docker-compose`, o
+compose de deploy, o `Dockerfile` de cada app (dentro dos submodules) e a configuração do Nginx.
+
+Funciona em **qualquer** dashboard/gerenciador de home server: Docker Compose via SSH, Portainer,
+Dockge, Komodo, CasaOS, ou apenas como link em Homarr/Homepage/Dashy.
 
 ## Arquitetura
 
@@ -20,137 +23,149 @@ navegador ──:5173──► Nginx ──► serve o dist/ do frontend (Logged
 
 O app é **same-origin**: o navegador fala só com a porta `5173`, e o Nginx faz proxy reverso
 para a API. Assim **não há CORS**, e funciona a partir de qualquer dispositivo da rede
-(`http://<ip-do-servidor>:5173`) sem embutir IP no build.
-
-- Frontend: servido pelo Nginx na porta `5173`.
-- API: FastAPI na `8000` (interna; Swagger acessível via `http://<host>:5173/docs`).
-- Dados: SQLite (`logged.db`) + `uploads/`.
-
-> A porta `8000` é publicada apenas no compose de desenvolvimento local, para acesso direto à
-> API/Swagger. No CasaOS só a `5173` é exposta.
+(`http://<ip-do-servidor>:5173`) sem embutir IP no build. A porta `8000` fica interna.
 
 ## Pré-requisitos
 
-- Docker com Compose v2 (`docker compose version`)
+- Docker com Compose v2 (`docker compose version`) — ou um dashboard/gerenciador que aceite compose.
 
-## Rodar localmente
+## Imagens publicadas
+
+| Imagem | Descrição |
+|---|---|
+| `ghcr.io/sergio-bogaro/logged-api` | Backend FastAPI |
+| `ghcr.io/sergio-bogaro/logged-web` | Frontend + Nginx (proxy para a API) |
+
+- Tags: `latest`, versões (`1.0.0`, `1.0`, `1`) e `sha-<curto>`.
+- Arquitetura: `linux/amd64`.
+- Os pacotes precisam estar **públicos** no GitHub (Package → Settings → Change visibility).
+
+## Opção 1 — Rodar localmente (build da fonte)
+
+Útil para desenvolvimento. Constrói as imagens a partir dos submodules.
 
 ```bash
-# Clone com os dois submodules
 git clone --recurse-submodules https://github.com/sergio-bogaro/Logged.git
 cd Logged
-
-# Configure a chave do TMDB usada no build do frontend (copie e edite)
-cp .env.example .env
-
-# Build + start
+cp .env.example .env        # edite o VITE_TMDB_API_KEY (chave do TMDB, embutida no build)
 docker compose up --build -d
 ```
 
-Acesse **http://localhost:5173**. Swagger em http://localhost:5173/docs.
+Acesse **http://localhost:5173** (Swagger em `/docs`).
+
+## Opção 2 — Deploy no home server (pull das imagens)
+
+Não precisa de código-fonte nem build: só baixar as imagens do GHCR.
 
 ```bash
-docker compose logs -f      # logs
-docker compose down         # para (mantém os dados)
-docker compose down -v      # para e apaga banco + uploads
-docker compose up --build   # rebuild após mudar código
+docker compose -f deploy/docker-compose.yml up -d
 ```
 
-## Instalar no CasaOS (app customizado)
+Variáveis opcionais (defina num `.env` ao lado do compose ou no painel):
 
-O CasaOS **não constrói imagens** — ele sobe imagens já existentes. Por isso o fluxo é:
-**clonar e buildar no servidor** e só então instalar o app no CasaOS.
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `LOGGED_TAG` | `latest` | Tag da imagem (ex.: `1.0.0` para fixar versão) |
+| `LOGGED_WEB_PORT` | `5173` | Porta no host |
+| `IGDB_CLIENT_ID` | — | Busca de jogos (opcional) |
+| `IGDB_CLIENT_SECRET` | — | Busca de jogos (opcional) |
 
-### 1. No servidor (via SSH), buildar as imagens
+### Docker Compose (SSH)
 
 ```bash
-git clone --recurse-submodules https://github.com/sergio-bogaro/Logged.git
-cd Logged
-docker compose build        # cria logged-api:latest e logged-web:latest
+docker compose -f deploy/docker-compose.yml up -d
+docker compose -f deploy/docker-compose.yml logs -f
+docker compose -f deploy/docker-compose.yml pull   # atualizar
 ```
 
-Não é preciso subir com `docker compose up`; as imagens ficam prontas para o CasaOS.
+### Portainer / Dockge / Komodo
 
-> Se você subiu localmente na mesma máquina para testar, rode `docker compose down` antes de
-> instalar no CasaOS, para liberar a porta `5173`.
+- **Portainer:** Stacks → Add stack → cole o conteúdo de `deploy/docker-compose.yml`
+  (ou aponte para o repositório Git com esse caminho) → Deploy.
+- **Dockge:** Novo stack → cole o YAML → Deploy.
+- **Komodo:** Create Stack → use o compose acima como Stack.
 
-### 2. No CasaOS, instalar o app
+Em todos, defina `IGDB_*` nas variáveis de ambiente do stack, se quiser a busca de jogos.
 
-1. App Store → **“+”** → **“Install a customized app”**.
-2. **Import** → cole o conteúdo de [`casaos/docker-compose.yml`](casaos/docker-compose.yml).
-3. Preencha, se quiser a busca de jogos, `IGDB_CLIENT_ID` e `IGDB_CLIENT_SECRET`.
-4. Install.
+### Dashboards de links (Homarr / Homepage / Dashy / Heimdall)
 
-O tile **Logged** aparece no dashboard; clicar nele abre `http://<ip-do-servidor>:5173`.
+Não consomem compose: basta cadastrar um link/apontamento para
+`http://<ip-do-servidor>:5173` e usar um ícone qualquer. (A imagem já sobe via compose/gerenciador.)
 
-### Onde ficam os dados
+### CasaOS (app customizado)
 
-```
-/DATA/AppData/logged/
-├── logged.db     ← banco SQLite
-└── uploads/      ← imagens enviadas
-```
-
-Para backup, basta copiar essa pasta.
+1. App Store → **“+” → “Install a customized app” → Import** → cole `deploy/docker-compose.yml`.
+2. Ajuste `IGDB_*` na UI, se quiser.
+3. Install. O tile **Logged** aparece no dashboard (metadados `x-casaos` do arquivo).
 
 ## Configuração e segredos
 
-| Variável | Onde fica | Obrigatória | Descrição |
-|---|---|---|---|
-| `VITE_TMDB_API_KEY` | `.env` na raiz (build local) | não | Chave do TMDB, embutida no bundle. Sem ela a busca de filmes fica indisponível. |
-| `IGDB_CLIENT_ID` | `LoggedApi/.env` (local) ou UI do CasaOS | não | Credenciais Twitch/IGDB para a busca de jogos. |
-| `IGDB_CLIENT_SECRET` | `LoggedApi/.env` (local) ou UI do CasaOS | não | idem. |
+| Variável | Onde | Descrição |
+|---|---|---|
+| `VITE_TMDB_API_KEY` | secret do repo **LoggedApp** (CI) ou `.env` na raiz (build local) | Chave do TMDB, embutida no bundle. Sem ela a busca de filmes fica indisponível. |
+| `IGDB_CLIENT_ID` / `IGDB_CLIENT_SECRET` | variáveis do stack (deploy) ou `LoggedApi/.env` (local) | Credenciais Twitch/IGDB para a busca de jogos. |
 
-Nenhum segredo é versionado. O `env_file` do backend é opcional: se `LoggedApi/.env` não
-existir, a API sobe normalmente (só a busca de jogos fica indisponível).
+Nenhum segredo é versionado.
+
+## Dados e backup
+
+Por padrão os dados ficam no volume nomeado `logged_data`:
+
+```
+logged.db     ← banco SQLite
+uploads/      ← imagens enviadas
+```
+
+Para dados visíveis no host (backup simples), troque o volume por um bind mount em
+`deploy/docker-compose.yml`:
+
+```yaml
+    volumes:
+      - /caminho/no/host/logged:/data
+```
 
 ## Atualizar
 
-**Local:** `git pull && git submodule update --init --recursive && docker compose up --build -d`.
+- Fixe uma versão com `LOGGED_TAG=1.0.0` ou use `latest`.
+- Para atualizar: `docker compose -f deploy/docker-compose.yml pull` e depois `up -d`.
+- No painel, use “Pull & Redeploy”/“Recreate” do stack.
 
-**CasaOS:**
+## Publicar novas imagens (CI)
+
+Os workflows `.github/workflows/docker-publish.yml` (em cada submodule) publicam no GHCR:
+
+- **push em `master`** → `latest` + `sha-<curto>`;
+- **tag `v1.2.3`** → `1.2.3`, `1.2`, `1`, `latest`.
+
+Após o primeiro push, marque os pacotes `logged-api` e `logged-web` como **públicos**.
+
+## Limpeza de disco (build local)
 
 ```bash
-cd Logged
-git pull
-git submodule update --init --recursive
-docker compose build
+docker builder prune -f
+docker image prune -f
 ```
 
-Depois, no CasaOS, **pare e inicie** o app na dashboard para ele recriar os containers com as
-novas imagens (se ele insistir na imagem antiga, use “Reinstall”/“Recreate” no menu do app).
+## Estrutura
 
-## Limpeza de disco
-
-O build do frontend (Node) gera bastante cache. De tempos em tempos:
-
-```bash
-docker builder prune -f     # limpa cache de build
-docker image prune -f       # remove imagens órfãs
+```
+.
+├── docker-compose.yml            # desenvolvimento local (build da fonte)
+├── deploy/
+│   └── docker-compose.yml        # deploy genérico (pull do GHCR, x-casaos)
+├── .env.example
+├── .gitignore
+├── .gitmodules
+├── LoggedApi/   (submodule — Dockerfile + workflow de publicação)
+└── LoggedApp/   (submodule — Dockerfile, nginx.conf + workflow de publicação)
 ```
 
 ## Solução de problemas
 
 | Sintoma | Causa / solução |
 |---|---|
-| API não responde ao abrir de outro dispositivo | Confirme que está acessando pela **porta 5173** (mesma origem), não pela `8000`. |
-| `pull access denied` / erro ao instalar no CasaOS | As imagens locais não existem ou o `pull_policy: never` é ignorado. Rode `docker compose build` no servidor e confirme `docker images` mostrando `logged-api` e `logged-web`. |
-| Porta 5173 em uso | Pare o app no CasaOS ou rode `docker compose down` do compose de desenvolvimento na mesma máquina. |
-| CasaOS usa a imagem antiga após atualizar | Pare/inicie ou reinstale o app no CasaOS para recriar o container. |
-
-> Alternativa futura: publicar as imagens num registry (ex.: GHCR) e trocar `pull_policy: never`
-> por `always` simplificaria as atualizações (sem build no servidor). Não é necessário hoje.
-
-## Estrutura
-
-```
-.
-├── docker-compose.yml        # desenvolvimento local (build da fonte)
-├── casaos/
-│   └── docker-compose.yml    # app customizado do CasaOS (imagens locais)
-├── .env.example
-├── .gitignore
-├── .gitmodules
-├── LoggedApi/   (submodule — contém Dockerfile e .dockerignore)
-└── LoggedApp/   (submodule — contém Dockerfile, nginx.conf e .dockerignore)
-```
+| API não responde de outro dispositivo | Acesse pela **porta 5173** (mesma origem), não pela `8000`. |
+| `manifest unknown` / erro ao subir | Pacote do GHCR privado ou tag inexistente. Torne o pacote público e/ou confira a tag. |
+| Porta 5173 em uso | Outro app usa a porta; ajuste `LOGGED_WEB_PORT`. |
+| Imagem antiga após atualizar | Rode `pull` no stack/gerenciador e recrie o container. |
+| Busca de filmes/jogos indisponível | Falta `VITE_TMDB_API_KEY` (build) ou `IGDB_*` (runtime). |
