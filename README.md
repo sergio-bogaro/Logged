@@ -14,7 +14,7 @@ Dockge, Komodo, CasaOS, ou apenas como link em Homarr/Homepage/Dashy.
 ```
 navegador ──:5173──► Nginx ──► serve o dist/ do frontend (LoggedApp)
                         │
-                        └──/api,/auth,/uploads,/custom-views──► FastAPI :8000 (LoggedApi)
+                        └──/api,/auth,/uploads──► FastAPI :8000 (LoggedApi)
                                                                      │
                                                          dados persistidos
                                                          ├── logged.db
