@@ -9,7 +9,9 @@
 # Variáveis (opcionais) — defina num .env ao lado deste arquivo:
 #   LOGGED_TAG       tag da imagem (padrão: latest; ex.: 1.0.0)
 #   LOGGED_WEB_PORT  porta no host (padrão: 5173)
-#   IGDB_CLIENT_ID / IGDB_CLIENT_SECRET  credenciais para a busca de jogos
+#   TMDB_API_KEY / IGDB_CLIENT_ID / IGDB_CLIENT_SECRET
+#                    fallback de instância — cada usuário pode configurar as
+#                    próprias chaves dentro do app (Integrações)
 
 services:
   api:
@@ -20,6 +22,8 @@ services:
       UPLOAD_DIR: /data/uploads
       IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
       IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
+      # Fallback de instância (opcional); o usuário pode ter a própria chave no app.
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
     volumes:
       - logged_data:/data
       # Para os dados ficarem visíveis no host (backup simples), troque a linha

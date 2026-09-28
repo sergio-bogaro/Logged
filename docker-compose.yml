@@ -13,6 +13,8 @@ services:
       DATABASE_URL: sqlite:////data/logged.db
       UPLOAD_DIR: /data/uploads
       CORS_ORIGINS: '["http://localhost:5173","http://localhost:8000"]'
+      # Fallback de instância (opcional): cada usuário pode ter a própria chave no app.
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
     volumes:
       - logged_data:/data
     ports:
@@ -22,10 +24,8 @@ services:
   web:
     build:
       context: ./LoggedApp
-      args:
-        # Same-origin: NÃO definir VITE_API_BASE_URL aqui faz o build usar URLs
-        # relativas ("/api/..."), servidas pelo proxy do Nginx. Evita CORS.
-        VITE_TMDB_API_KEY: ${VITE_TMDB_API_KEY:-}
+      # Sem build args de chave: as chaves de API são por usuário e ficam no backend.
+      # O build usa URLs relativas ("/api/...") e o Nginx faz o proxy (same-origin).
     container_name: logged-web
     depends_on:
       - api

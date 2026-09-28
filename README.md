@@ -47,7 +47,7 @@ para a API. Assim **não há CORS**, e funciona a partir de qualquer dispositivo
 ```bash
 git clone --recurse-submodules https://github.com/sergio-bogaro/Logged.git
 cd Logged
-cp .env.example .env        # edite o VITE_TMDB_API_KEY (chave do TMDB, embutida no build)
+cp .env.example .env        # opcional: chaves como fallback de instância
 docker compose up --build -d
 ```
 
@@ -67,8 +67,12 @@ Variáveis opcionais (defina num `.env` ao lado do compose ou no painel):
 |---|---|---|
 | `LOGGED_TAG` | `latest` | Tag da imagem (ex.: `1.0.0` para fixar versão) |
 | `LOGGED_WEB_PORT` | `5173` | Porta no host |
-| `IGDB_CLIENT_ID` | — | Busca de jogos (opcional) |
-| `IGDB_CLIENT_SECRET` | — | Busca de jogos (opcional) |
+| `TMDB_API_KEY` | — | Fallback de instância para filmes (opcional) |
+| `IGDB_CLIENT_ID` | — | Fallback de instância para jogos (opcional) |
+| `IGDB_CLIENT_SECRET` | — | Fallback de instância para jogos (opcional) |
+
+> As chaves podem ser definidas **por usuário dentro do app** (ver abaixo). As variáveis
+> acima são apenas um fallback para toda a instância.
 
 ### Docker Compose (SSH)
 
@@ -85,7 +89,8 @@ docker compose -f deploy/docker-compose.yml pull   # atualizar
 - **Dockge:** Novo stack → cole o YAML → Deploy.
 - **Komodo:** Create Stack → use o compose acima como Stack.
 
-Em todos, defina `IGDB_*` nas variáveis de ambiente do stack, se quiser a busca de jogos.
+Em todos, defina as variáveis de fallback (`TMDB_API_KEY`, `IGDB_*`) no stack, se quiser;
+de qualquer forma cada usuário pode informar as próprias chaves no app.
 
 ### Dashboards de links (Homarr / Homepage / Dashy / Heimdall)
 
@@ -95,17 +100,34 @@ Não consomem compose: basta cadastrar um link/apontamento para
 ### CasaOS (app customizado)
 
 1. App Store → **“+” → “Install a customized app” → Import** → cole `deploy/docker-compose.yml`.
-2. Ajuste `IGDB_*` na UI, se quiser.
+2. Ajuste as variáveis de fallback (`TMDB_API_KEY`, `IGDB_*`) na UI, se quiser.
 3. Install. O tile **Logged** aparece no dashboard (metadados `x-casaos` do arquivo).
+4. Ao entrar no app, cada usuário pode cadastrar as próprias chaves em **Integrações**.
 
-## Configuração e segredos
+## Integrações (chaves de API)
 
-| Variável | Onde | Descrição |
-|---|---|---|
-| `VITE_TMDB_API_KEY` | secret do repo **LoggedApp** (CI) ou `.env` na raiz (build local) | Chave do TMDB, embutida no bundle. Sem ela a busca de filmes fica indisponível. |
-| `IGDB_CLIENT_ID` / `IGDB_CLIENT_SECRET` | variáveis do stack (deploy) ou `LoggedApi/.env` (local) | Credenciais Twitch/IGDB para a busca de jogos. |
+As chaves de API **não ficam na imagem** e **nunca chegam ao navegador**: o backend faz o
+proxy das chamadas ao TMDB e ao IGDB usando a chave resolvida no servidor.
 
-Nenhum segredo é versionado.
+Ordem de resolução:
+
+1. **Chave do usuário** — cadastrada no app (Onboarding › Integrações ou
+   Configurações › Integrações). Fica salva no banco do servidor.
+2. **Fallback da instância** — variáveis de ambiente (`TMDB_API_KEY`, `IGDB_CLIENT_ID`,
+   `IGDB_CLIENT_SECRET`) definidas no `.env`/stack.
+
+A UI mostra apenas o **status** (configurado por você / fornecido pelo servidor / não
+configurado); o valor salvo nunca é exibido. Para remover uma chave pessoal, use **Limpar**.
+
+| Chave | Efeito |
+|---|---|
+| `TMDB_API_KEY` | Habilita a busca de filmes |
+| `IGDB_CLIENT_ID` + `IGDB_CLIENT_SECRET` | Habilita a busca de jogos |
+
+Sem chave, o tipo de mídia correspondente fica desabilitado nas configurações de tracking.
+
+> As chaves ficam em texto plano no SQLite, coerente com a autenticação simples do projeto
+> (app pessoal). Nenhum segredo é versionado.
 
 ## Dados e backup
 
@@ -168,4 +190,4 @@ docker image prune -f
 | `manifest unknown` / erro ao subir | Pacote do GHCR privado ou tag inexistente. Torne o pacote público e/ou confira a tag. |
 | Porta 5173 em uso | Outro app usa a porta; ajuste `LOGGED_WEB_PORT`. |
 | Imagem antiga após atualizar | Rode `pull` no stack/gerenciador e recrie o container. |
-| Busca de filmes/jogos indisponível | Falta `VITE_TMDB_API_KEY` (build) ou `IGDB_*` (runtime). |
+| Busca de filmes/jogos indisponível | Configure a chave em **Integrações** (no app) ou defina `TMDB_API_KEY`/`IGDB_*` como fallback da instância. |
