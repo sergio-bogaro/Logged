@@ -4,94 +4,150 @@ Repositório de orquestração que sobe o backend ([LoggedApi](https://github.co
 e o frontend ([LoggedApp](https://github.com/sergio-bogaro/LoggedApp)) juntos via Docker Compose.
 
 Os dois projetos entram como **git submodules**; este repo guarda apenas o `docker-compose.yml`,
-o `Dockerfile` de cada app (dentro dos próprios submodules) e a configuração do Nginx.
+o compose do CasaOS, o `Dockerfile` de cada app (dentro dos submodules) e a configuração do Nginx.
 
 ## Arquitetura
 
 ```
-navegador ──:5173──► Nginx (serve o dist/ do LoggedApp)  ──chamadas de API──► :8000 FastAPI (LoggedApi)
-                                                                                    │
-                                                                        volume logged_data:/data
-                                                                        ├── logged.db
-                                                                        └── uploads/
+navegador ──:5173──► Nginx ──► serve o dist/ do frontend (LoggedApp)
+                        │
+                        └──/api,/auth,/uploads,/custom-views──► FastAPI :8000 (LoggedApi)
+                                                                     │
+                                                         dados persistidos
+                                                         ├── logged.db
+                                                         └── uploads/
 ```
 
-- O frontend buildado é servido por **Nginx** na porta `5173` (reaproveita o CORS já configurado no backend).
-- A API roda em `http://localhost:8000` (Swagger em `/docs`) e é chamada diretamente pelo navegador.
-- Banco SQLite e uploads persistem no volume nomeado `logged_data`.
+O app é **same-origin**: o navegador fala só com a porta `5173`, e o Nginx faz proxy reverso
+para a API. Assim **não há CORS**, e funciona a partir de qualquer dispositivo da rede
+(`http://<ip-do-servidor>:5173`) sem embutir IP no build.
+
+- Frontend: servido pelo Nginx na porta `5173`.
+- API: FastAPI na `8000` (interna; Swagger acessível via `http://<host>:5173/docs`).
+- Dados: SQLite (`logged.db`) + `uploads/`.
+
+> A porta `8000` é publicada apenas no compose de desenvolvimento local, para acesso direto à
+> API/Swagger. No CasaOS só a `5173` é exposta.
 
 ## Pré-requisitos
 
 - Docker com Compose v2 (`docker compose version`)
 
-## Uso
+## Rodar localmente
 
 ```bash
 # Clone com os dois submodules
-git clone --recurse-submodules <url-deste-repo> Logged
+git clone --recurse-submodules https://github.com/sergio-bogaro/Logged.git
 cd Logged
 
-# Configure a chave do TMDB usada no build do frontend
-cp .env.example .env      # depois edite VITE_TMDB_API_KEY
+# Configure a chave do TMDB usada no build do frontend (copie e edite)
+cp .env.example .env
 
-# Suba tudo
-docker compose up --build
+# Build + start
+docker compose up --build -d
 ```
 
-Acesse:
-
-- App: http://localhost:5173
-- API: http://localhost:8000
-- Swagger: http://localhost:8000/docs
-
-Se você já tinha clonado sem `--recurse-submodules`:
+Acesse **http://localhost:5173**. Swagger em http://localhost:5173/docs.
 
 ```bash
-git submodule update --init --recursive
+docker compose logs -f      # logs
+docker compose down         # para (mantém os dados)
+docker compose down -v      # para e apaga banco + uploads
+docker compose up --build   # rebuild após mudar código
 ```
 
-Atualizar os submodules para as versões mais recentes dos repositórios:
+## Instalar no CasaOS (app customizado)
+
+O CasaOS **não constrói imagens** — ele sobe imagens já existentes. Por isso o fluxo é:
+**clonar e buildar no servidor** e só então instalar o app no CasaOS.
+
+### 1. No servidor (via SSH), buildar as imagens
 
 ```bash
-git submodule update --remote --merge
+git clone --recurse-submodules https://github.com/sergio-bogaro/Logged.git
+cd Logged
+docker compose build        # cria logged-api:latest e logged-web:latest
 ```
 
-## Segredos e configuração
+Não é preciso subir com `docker compose up`; as imagens ficam prontas para o CasaOS.
+
+> Se você subiu localmente na mesma máquina para testar, rode `docker compose down` antes de
+> instalar no CasaOS, para liberar a porta `5173`.
+
+### 2. No CasaOS, instalar o app
+
+1. App Store → **“+”** → **“Install a customized app”**.
+2. **Import** → cole o conteúdo de [`casaos/docker-compose.yml`](casaos/docker-compose.yml).
+3. Preencha, se quiser a busca de jogos, `IGDB_CLIENT_ID` e `IGDB_CLIENT_SECRET`.
+4. Install.
+
+O tile **Logged** aparece no dashboard; clicar nele abre `http://<ip-do-servidor>:5173`.
+
+### Onde ficam os dados
+
+```
+/DATA/AppData/logged/
+├── logged.db     ← banco SQLite
+└── uploads/      ← imagens enviadas
+```
+
+Para backup, basta copiar essa pasta.
+
+## Configuração e segredos
 
 | Variável | Onde fica | Obrigatória | Descrição |
 |---|---|---|---|
-| `VITE_TMDB_API_KEY` | `.env` (raiz) | não | Chave do TMDB, embutida no build do frontend. Sem ela a busca de filmes fica indisponível. |
-| `IGDB_CLIENT_ID` | `LoggedApi/.env` | não | Credenciais Twitch/IGDB para a busca de jogos. |
-| `IGDB_CLIENT_SECRET` | `LoggedApi/.env` | não | idem. |
+| `VITE_TMDB_API_KEY` | `.env` na raiz (build local) | não | Chave do TMDB, embutida no bundle. Sem ela a busca de filmes fica indisponível. |
+| `IGDB_CLIENT_ID` | `LoggedApi/.env` (local) ou UI do CasaOS | não | Credenciais Twitch/IGDB para a busca de jogos. |
+| `IGDB_CLIENT_SECRET` | `LoggedApi/.env` (local) ou UI do CasaOS | não | idem. |
 
-Ambos os arquivos `.env` são ignorados pelo git. O `env_file` do backend é opcional:
-se `LoggedApi/.env` não existir, a API sobe normalmente.
+Nenhum segredo é versionado. O `env_file` do backend é opcional: se `LoggedApi/.env` não
+existir, a API sobe normalmente (só a busca de jogos fica indisponível).
 
-## Operação
+## Atualizar
+
+**Local:** `git pull && git submodule update --init --recursive && docker compose up --build -d`.
+
+**CasaOS:**
 
 ```bash
-docker compose logs -f          # acompanhar logs
-docker compose down             # parar (mantém o volume de dados)
-docker compose down -v          # parar e apagar banco + uploads
-docker compose up --build       # rebuild após mudar código
+cd Logged
+git pull
+git submodule update --init --recursive
+docker compose build
 ```
 
-### Reaproveitar dados de um setup local
+Depois, no CasaOS, **pare e inicie** o app na dashboard para ele recriar os containers com as
+novas imagens (se ele insistir na imagem antiga, use “Reinstall”/“Recreate” no menu do app).
 
-Por padrão os dados ficam no volume `logged_data`. Para usar um `logged.db` e uma pasta
-`uploads/` que já existem em `LoggedApi/`, troque o volume por bind mounts no `docker-compose.yml`:
+## Limpeza de disco
 
-```yaml
-    volumes:
-      - ./LoggedApi/logged.db:/data/logged.db
-      - ./LoggedApi/uploads:/data/uploads
+O build do frontend (Node) gera bastante cache. De tempos em tempos:
+
+```bash
+docker builder prune -f     # limpa cache de build
+docker image prune -f       # remove imagens órfãs
 ```
+
+## Solução de problemas
+
+| Sintoma | Causa / solução |
+|---|---|
+| API não responde ao abrir de outro dispositivo | Confirme que está acessando pela **porta 5173** (mesma origem), não pela `8000`. |
+| `pull access denied` / erro ao instalar no CasaOS | As imagens locais não existem ou o `pull_policy: never` é ignorado. Rode `docker compose build` no servidor e confirme `docker images` mostrando `logged-api` e `logged-web`. |
+| Porta 5173 em uso | Pare o app no CasaOS ou rode `docker compose down` do compose de desenvolvimento na mesma máquina. |
+| CasaOS usa a imagem antiga após atualizar | Pare/inicie ou reinstale o app no CasaOS para recriar o container. |
+
+> Alternativa futura: publicar as imagens num registry (ex.: GHCR) e trocar `pull_policy: never`
+> por `always` simplificaria as atualizações (sem build no servidor). Não é necessário hoje.
 
 ## Estrutura
 
 ```
 .
-├── docker-compose.yml
+├── docker-compose.yml        # desenvolvimento local (build da fonte)
+├── casaos/
+│   └── docker-compose.yml    # app customizado do CasaOS (imagens locais)
 ├── .env.example
 ├── .gitignore
 ├── .gitmodules

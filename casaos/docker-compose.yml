@@ -1,0 +1,62 @@
+# Compose para instalar o Logged como app customizado no CasaOS.
+#
+# IMPORTANTE: o CasaOS NÃO constrói imagens — ele só sobe imagens existentes.
+# Por isso, antes de instalar este app, as imagens precisam existir no Docker da
+# MESMA máquina onde o CasaOS roda. No servidor, na raiz deste repositório:
+#
+#   git clone --recurse-submodules https://github.com/sergio-bogaro/Logged.git
+#   cd Logged
+#   docker compose build      # cria logged-api:latest e logged-web:latest
+#
+# Depois, no CasaOS:
+#   App Store → "+" → "Install a customized app" → Import → cole este arquivo.
+#
+# Os dados (banco + uploads) ficam em /DATA/AppData/logged (fácil de fazer backup).
+
+services:
+  api:
+    image: logged-api:latest
+    # Não tenta baixar do registry: usa a imagem construída localmente.
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: sqlite:////data/logged.db
+      UPLOAD_DIR: /data/uploads
+      # Preencha as credenciais do IGDB na UI do CasaOS ao instalar.
+      # NÃO commite segredos reais neste arquivo.
+      IGDB_CLIENT_ID: ${IGDB_CLIENT_ID:-}
+      IGDB_CLIENT_SECRET: ${IGDB_CLIENT_SECRET:-}
+    volumes:
+      - /DATA/AppData/logged:/data
+
+  web:
+    image: logged-web:latest
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - target: 80
+        published: "5173"
+        protocol: tcp
+        mode: ingress
+
+x-casaos:
+  architectures:
+    - amd64
+  main: web
+  author: sergio-bogaro
+  developer: sergio-bogaro
+  icon: https://raw.githubusercontent.com/sergio-bogaro/LoggedApp/master/public/favicon.svg
+  title:
+    en_us: Logged
+  tagline:
+    en_us: Track everything you consume
+  description:
+    en_us: >-
+      Self-hosted tracker for the movies, series, anime, manga, games and books
+      you consume.
+  category: Media
+  port_map: "5173"
+  scheme: http
+  index: /

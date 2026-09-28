@@ -23,7 +23,8 @@ services:
     build:
       context: ./LoggedApp
       args:
-        VITE_API_BASE_URL: http://localhost:8000
+        # Same-origin: NÃO definir VITE_API_BASE_URL aqui faz o build usar URLs
+        # relativas ("/api/..."), servidas pelo proxy do Nginx. Evita CORS.
         VITE_TMDB_API_KEY: ${VITE_TMDB_API_KEY:-}
     container_name: logged-web
     depends_on:
