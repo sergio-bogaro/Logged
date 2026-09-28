@@ -126,6 +126,20 @@ configurado); o valor salvo nunca é exibido. Para remover uma chave pessoal, us
 
 Sem chave, o tipo de mídia correspondente fica desabilitado nas configurações de tracking.
 
+### Como obter as chaves
+
+Dentro do app há um ícone **“?”** ao lado de cada integração com esses mesmos passos.
+
+**TMDB (filmes)** — https://www.themoviedb.org/settings/api
+1. Crie uma conta gratuita em `themoviedb.org`.
+2. *Account Settings → API → Request an API Key* (uso pessoal).
+3. Copie a **API Key** (não o *Read Access Token* — a API usa autenticação `api_key` v3).
+
+**IGDB (jogos)** — https://dev.twitch.tv/console/apps
+1. Entre com uma conta **Twitch**.
+2. *Developer Console → Register Your Application*.
+3. Copie o **Client ID** e gere/copie o **Client Secret** (aparece uma única vez).
+
 > As chaves ficam em texto plano no SQLite, coerente com a autenticação simples do projeto
 > (app pessoal). Nenhum segredo é versionado.
 
