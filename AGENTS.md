@@ -16,6 +16,7 @@ Run git commands from inside the relevant subdirectory. There is no monorepo too
 Backend (workdir `LoggedApi`, with `.venv` activated):
 ```
 uvicorn main:app --reload --port 8000      # dev server; Swagger at /docs
+python -m unittest discover -s tests -v    # smoked/regression tests
 ```
 
 Frontend (workdir `LoggedApp`):
@@ -27,7 +28,7 @@ npm run lint       # eslint . --fix  (auto-fixes; there is no separate check-onl
 npm run preview    # serve built dist/
 ```
 
-There are **no tests** in either project and no `test` script. Do not invent test commands.
+Backend has `unittest` regression tests in `LoggedApi/tests/` (run with `python -m unittest discover -s tests -v`). Frontend has no test suite; use `npx tsc -b`, `npx eslint .` and `npm run build` as checks.
 
 ## Backend conventions (`LoggedApi/`)
 

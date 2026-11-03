@@ -29,14 +29,31 @@ services:
       # Para os dados ficarem visíveis no host (backup simples), troque a linha
       # acima por um bind mount, por exemplo:
       #   - /caminho/no/host/logged:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   web:
     image: ghcr.io/sergio-bogaro/logged-web:${LOGGED_TAG:-latest}
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "${LOGGED_WEB_PORT:-5173}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   logged_data:
