@@ -37,7 +37,7 @@ para a API. Assim **não há CORS**, e funciona a partir de qualquer dispositivo
 | `ghcr.io/sergio-bogaro/logged-web` | Frontend + Nginx (proxy para a API) |
 
 - Tags: `latest`, versões (`1.0.0`, `1.0`, `1`) e `sha-<curto>`.
-- Arquitetura: `linux/amd64`.
+- Arquitetura: `linux/amd64` e `linux/arm64`.
 - Os pacotes precisam estar **públicos** no GitHub (Package → Settings → Change visibility).
 
 ## Opção 1 — Rodar localmente (build da fonte)
